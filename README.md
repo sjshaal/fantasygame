@@ -1,5 +1,7 @@
 # Potion & Prophecy 🧪
 
+**Play it live: [sjshaal.github.io/fantasygame](https://sjshaal.github.io/fantasygame/)**
+
 A browser-based fantasy potion-brewing game. Gather ingredients from the shelf, combine them in the cauldron, and discover recipes as you brew — with your discoveries tracked in an in-game journal.
 
 ## Features
