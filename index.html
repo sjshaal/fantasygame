@@ -1,0 +1,1002 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Potion & Prophecy</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&family=Lora:ital,wght@0,400;0,500;1,400&display=swap" rel="stylesheet"/>
+  <style>
+    body { font-family: 'Lora', serif; }
+    .font-display, h1, h2, h3 { font-family: 'Cinzel', serif; }
+
+    /* ── Video background ─────────────────────────────── */
+    #bg-video {
+      position: fixed; inset: 0;
+      width: 100%; height: 100%;
+      object-fit: cover;
+      z-index: -2;
+      transition: filter 1.4s ease;
+    }
+    /* Mood-tinted overlay sits between video and UI */
+    #bg-overlay {
+      position: fixed; inset: 0;
+      z-index: -1;
+      transition: background 1.4s ease;
+    }
+
+    /* ── Animations ─────────────────────────────────── */
+    @keyframes cauldronGlow {
+      0%,100% { box-shadow: 0 0 18px rgba(160,90,20,.5), 0 0 45px rgba(210,150,40,.2); }
+      50%      { box-shadow: 0 0 34px rgba(160,90,20,.8), 0 0 80px rgba(210,150,40,.4);  }
+    }
+    @keyframes bubbleRise {
+      0%   { transform: translateY(0) scale(1);       opacity: .75; }
+      100% { transform: translateY(-54px) scale(.3);  opacity: 0;   }
+    }
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(10px); }
+      to   { opacity: 1; transform: translateY(0);    }
+    }
+    /* Luma sprite */
+@keyframes lumaFloat {
+      0%,100% { transform: translateY(0) scale(1); }
+      50%      { transform: translateY(-5px) scale(1.05); }
+    }
+    @keyframes lumaGlow {
+      0%,100% { box-shadow: 0 0 8px 3px rgba(120,180,255,0.55), 0 0 22px 5px rgba(100,160,255,0.2); }
+      50%      { box-shadow: 0 0 16px 5px rgba(150,210,255,0.85), 0 0 38px 10px rgba(100,160,255,0.4); }
+    }
+    @keyframes lumaAppear {
+      from { opacity:0; transform:scale(0) translateY(12px); }
+      to   { opacity:1; transform:scale(1) translateY(0); }
+    }
+    #luma-sprite { cursor:pointer; transition: transform .15s; }
+    #luma-sprite:hover { transform: scale(1.15) translateY(-2px) !important; }
+    #luma-sprite.luma-float {
+      animation: lumaFloat 3s ease-in-out infinite, lumaGlow 3s ease-in-out infinite;
+    }
+
+    @keyframes brewShake {
+      0%,100% { transform: scale(1) rotate(0deg);     }
+      20%      { transform: scale(1.09) rotate(-5deg); }
+      40%      { transform: scale(1.09) rotate(5deg);  }
+      60%      { transform: scale(1.06) rotate(-3deg); }
+      80%      { transform: scale(1.03) rotate(2deg);  }
+    }
+
+    .cauldron-glow  { animation: cauldronGlow 3s ease-in-out infinite; }
+    .brew-shake     { animation: brewShake .65s ease-in-out; }
+    .bubble-anim    { animation: bubbleRise var(--dur,2s) ease-out var(--del,0s) infinite; }
+    .fade-up        { animation: fadeUp .35s ease-out forwards; }
+
+    /* Scrollbar */
+    ::-webkit-scrollbar       { width: 5px; }
+    ::-webkit-scrollbar-track { background: rgba(232,213,163,.5); }
+    ::-webkit-scrollbar-thumb { background: #8b6040; border-radius: 4px; }
+
+    /* ── Frosted parchment panels ─────────────────────── */
+    /*  backdrop-filter lets the moving video subtly show  */
+    .glass-parchment {
+      background: rgba(250,238,208,0.82);
+      backdrop-filter: blur(6px);
+      -webkit-backdrop-filter: blur(6px);
+    }
+    .glass-dark {
+      background: rgba(35,15,5,0.72);
+      backdrop-filter: blur(5px);
+      -webkit-backdrop-filter: blur(5px);
+    }
+    .glass-nav {
+      background: rgba(55,22,6,0.78);
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+    }
+
+    /* Tab button */
+    .tab-btn { transition: background .2s, color .2s, border-color .2s; border-bottom: 3px solid transparent; }
+    .tab-btn.active {
+      background: rgba(250,238,208,0.9) !important;
+      color: #4a2e10 !important;
+      border-bottom-color: #d4a73a !important;
+    }
+
+    /* Ingredient card */
+    .ing-card { transition: transform .18s, box-shadow .18s; cursor: pointer; }
+    .ing-card:hover:not(.ing-disabled) { transform: translateY(-2px); box-shadow: 0 4px 14px rgba(0,0,0,.35); }
+    .ing-card.ing-selected { outline: 2px solid #d4a73a; box-shadow: 0 0 0 4px rgba(212,167,58,.3); }
+    .ing-card.ing-disabled { opacity: .4; cursor: not-allowed; pointer-events: none; }
+
+    /* Journal */
+    .journal-blur { filter: blur(3px); user-select: none; pointer-events: none; }
+
+    /* Location hero (Explore tab) */
+    #location-hero {
+      position: relative;
+      min-height: 160px;
+      border-radius: 1rem;
+      overflow: hidden;
+      display: flex;
+      align-items: flex-end;
+    }
+    #location-hero::before {
+      content: '';
+      position: absolute; inset: 0;
+      background: linear-gradient(to top, rgba(15,5,0,.85) 0%, rgba(15,5,0,.3) 60%, transparent 100%);
+    }
+  </style>
+</head>
+
+<body class="min-h-screen text-[#4a2e10]">
+
+<!-- ── Background video ────────────────────────────── -->
+<video id="bg-video" autoplay muted loop playsinline>
+  <source src="assets/workshop.mp4" type="video/mp4"/>
+</video>
+<!-- Mood overlay — JS changes this per location/tab -->
+<div id="bg-overlay" style="background:rgba(25,10,3,0.50);"></div>
+
+<!-- ════════════════ HEADER ════════════════ -->
+<header class="glass-dark border-b border-[#d4a73a]/40">
+  <div class="max-w-5xl mx-auto px-4 py-3 flex items-center gap-6">
+    <!-- Title -->
+    <div class="shrink-0">
+      <h1 class="font-display text-xl md:text-2xl text-[#f5e6c8] tracking-widest drop-shadow-lg cursor-pointer hover:text-[#d4a73a] transition-colors" onclick="goHome()">🧪 Potion &amp; Prophecy</h1>
+    </div>
+
+    <!-- Luma — hidden until summoned via Dream Tincture -->
+    <div id="luma-sprite" class="hidden shrink-0" onclick="lumaWhisper()" title="Luma — click to hear her whisper">
+      <video autoplay muted loop playsinline
+             class="rounded-full object-cover luma-float"
+             style="width:52px;height:52px;border:2px solid rgba(140,200,255,0.7);animation:lumaFloat 3s ease-in-out infinite,lumaGlow 3s ease-in-out infinite;">
+        <source src="assets/creature.mp4" type="video/mp4"/>
+      </video>
+    </div>
+
+    <!-- Chronicle log — inline next to title -->
+    <div class="flex-1 min-w-0">
+      <div class="flex items-center justify-between mb-0.5">
+        <span class="font-display text-xs tracking-widest text-[#d4a73a]">✦ CHRONICLE ✦</span>
+        <button onclick="clearLog()" class="text-xs text-[#7a5030] hover:text-[#d4a73a] transition-colors ml-2">Clear</button>
+      </div>
+      <div id="action-log" class="h-10 overflow-y-auto space-y-0.5 pr-1"></div>
+    </div>
+
+    <!-- Save/Load/New -->
+    <div class="flex gap-2 shrink-0">
+      <button onclick="saveGame()" class="text-xs px-3 py-1.5 rounded border border-[#d4a73a] text-[#d4a73a] hover:bg-[#d4a73a] hover:text-[#3a1808] transition-colors font-display tracking-wide">Save</button>
+      <button onclick="loadGame()" class="text-xs px-3 py-1.5 rounded border border-[#d4a73a] text-[#d4a73a] hover:bg-[#d4a73a] hover:text-[#3a1808] transition-colors font-display tracking-wide">Load</button>
+      <button onclick="newGame()" class="text-xs px-3 py-1.5 rounded border border-[#a06050] text-[#d09080] hover:bg-[#a06050] hover:text-[#f5e6c8] transition-colors font-display tracking-wide">New</button>
+      <button onclick="devFill()" title="Dev: fill all ingredients" class="text-xs px-2 py-1.5 rounded border border-white/10 text-white/20 hover:text-[#d4a73a] hover:border-[#d4a73a]/40 transition-colors">⚗️</button>
+    </div>
+  </div>
+</header>
+
+<!-- ════════════════ NAV TABS ════════════════ -->
+<nav class="glass-nav border-b-2 border-[#d4a73a]">
+  <div class="max-w-5xl mx-auto px-4 flex overflow-x-auto">
+    <button class="tab-btn px-4 md:px-6 py-3 font-display text-sm tracking-wider text-[#d4b080] hover:text-[#f5e6c8]" data-tab="workshop"  onclick="switchTab('workshop')">🧪 Workshop</button>
+    <button class="tab-btn px-4 md:px-6 py-3 font-display text-sm tracking-wider text-[#d4b080] hover:text-[#f5e6c8]"        data-tab="inventory" onclick="switchTab('inventory')">🎒 Inventory</button>
+    <button class="tab-btn px-4 md:px-6 py-3 font-display text-sm tracking-wider text-[#d4b080] hover:text-[#f5e6c8]"        data-tab="explore"   onclick="switchTab('explore')">🗺 Explore</button>
+    <button class="tab-btn px-4 md:px-6 py-3 font-display text-sm tracking-wider text-[#d4b080] hover:text-[#f5e6c8]"        data-tab="journal"   onclick="switchTab('journal')">📖 Journal</button>
+  </div>
+</nav>
+
+<!-- ════════════════ MAIN ════════════════ -->
+<main class="max-w-5xl mx-auto px-4 py-6">
+
+  <!-- ── LANDING — full video view shown before any tab is selected ── -->
+  <div id="landing" style="min-height:calc(100vh - 180px);"></div>
+
+  <!-- ── WORKSHOP ──────────────────────────────── -->
+  <div id="tab-workshop" class="tab-content hidden">
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+
+      <!-- Left: ingredient shelf -->
+      <div>
+        <div class="glass-parchment rounded-xl border border-[#d4b080]/60 p-5">
+          <h2 class="font-display text-lg text-[#6b3410] mb-1 pb-2 border-b border-[#d4b080]">✦ Ingredient Shelf</h2>
+          <p class="text-xs text-[#7a5030] italic mb-4">Click to add to cauldron (max 3). Click again to remove.</p>
+          <div id="workshop-ingredients" class="grid grid-cols-2 gap-2"></div>
+        </div>
+      </div>
+
+      <!-- Right: cauldron + recipes -->
+      <div class="space-y-4">
+        <div class="glass-parchment rounded-xl border border-[#d4b080]/60 p-5">
+          <h2 class="font-display text-lg text-[#6b3410] mb-2 pb-2 border-b border-[#d4b080]">✦ The Cauldron</h2>
+          <div class="flex flex-col items-center">
+
+            <!-- Cauldron pot -->
+            <div id="cauldron-el" class="cauldron-glow relative w-44 h-36 flex flex-col items-center justify-center overflow-hidden rounded-b-full rounded-t-lg"
+                 style="background:radial-gradient(ellipse at 50% 75%,#180600,#2e1000); border:3px solid #6b3410;">
+              <div class="bubble-anim absolute rounded-full" style="--dur:2.1s;--del:0s;   bottom:10px;left:26px; width:10px;height:10px;background:rgba(90,200,120,.6);"></div>
+              <div class="bubble-anim absolute rounded-full" style="--dur:1.7s;--del:.65s; bottom:7px; left:52px; width:7px; height:7px; background:rgba(130,180,90,.5);"></div>
+              <div class="bubble-anim absolute rounded-full" style="--dur:2.5s;--del:1.1s; bottom:11px;right:28px;width:13px;height:13px;background:rgba(70,210,140,.5);"></div>
+              <div class="bubble-anim absolute rounded-full" style="--dur:1.9s;--del:.3s;  bottom:6px; right:48px;width:7px; height:7px; background:rgba(150,195,70,.6);"></div>
+              <div class="z-10 text-center px-2">
+                <p id="cauldron-empty-msg" class="text-[#d4a73a] text-xs italic">Empty — add ingredients</p>
+                <div id="cauldron-items" class="flex flex-wrap justify-center gap-1.5"></div>
+                <p id="cauldron-hint" class="text-[#a0d0a0] text-xs mt-1 italic"></p>
+              </div>
+              <div class="absolute bottom-0 left-0 right-0 h-7 rounded-b-full opacity-25" style="background:radial-gradient(ellipse at center,rgba(80,200,130,.9),transparent);"></div>
+            </div>
+            <div class="w-48 h-4 rounded-full -mt-2 z-10" style="background:linear-gradient(90deg,#3a1808,#8b4c18,#6b3410,#8b4c18,#3a1808);"></div>
+            <div class="flex gap-12 -mt-0.5">
+              <div class="w-2.5 h-5 rounded-b" style="background:#2a0e04;"></div>
+              <div class="w-2.5 h-5 rounded-b" style="background:#2a0e04;"></div>
+            </div>
+
+            <button id="mix-btn" onclick="mixPotion()"
+                    class="mt-4 px-8 py-2.5 font-display text-sm tracking-widest rounded border-2 border-[#d4a73a] text-[#3a1808] transition-all hover:scale-105 active:scale-95 shadow-lg"
+                    style="background:linear-gradient(135deg,#d4a73a,#e8c060);">
+              ✦ MIX ✦
+            </button>
+            <button onclick="clearCauldron()" class="mt-2 text-xs text-[#7a5030] hover:text-[#4a2010] underline">Clear cauldron</button>
+          </div>
+        </div>
+
+        <!-- Recipe list -->
+        <div class="glass-parchment rounded-xl border border-[#d4b080]/60 p-4">
+          <h3 class="font-display text-sm text-[#6b3410] mb-2">📋 Known Recipes</h3>
+          <div id="recipe-hints" class="space-y-1.5"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── EXPLORE ──────────────────────────────── -->
+  <div id="tab-explore" class="tab-content hidden">
+
+    <!-- Map — fills remaining viewport height, never collapses -->
+    <div class="relative rounded-2xl overflow-hidden border-2 border-[#d4a73a]/60 shadow-2xl" style="height:calc(100vh - 120px);">
+
+      <!-- Map video -->
+      <video autoplay muted playsinline
+             class="absolute inset-0 w-full h-full object-cover"
+             style="filter:brightness(1) saturate(1);"
+             onended="this.currentTime=this.duration; this.pause();">
+        <source src="assets/map.mp4" type="video/mp4"/>
+      </video>
+
+      <!-- Hidden stubs kept for JS compat -->
+      <div id="travel-options" class="hidden"></div>
+      <div id="location-name-badge" class="hidden"></div>
+    </div>
+
+    <!-- Hidden stubs kept for JS compatibility -->
+    <div id="location-hero" class="hidden"></div>
+    <div id="location-hero-inner" class="hidden"></div>
+    <div id="location-display" class="hidden"></div>
+  </div>
+
+  <!-- ── JOURNAL ──────────────────────────────── -->
+  <div id="tab-journal" class="tab-content hidden">
+    <div class="glass-parchment rounded-xl border border-[#d4b080]/60 p-6 mb-5">
+      <h2 class="font-display text-xl text-[#6b3410] mb-1">✦ The Journal</h2>
+      <p class="text-sm text-[#7a5030] italic">Some pages reveal themselves only after drinking certain potions.</p>
+    </div>
+    <div id="journal-entries" class="grid grid-cols-1 md:grid-cols-2 gap-4"></div>
+  </div>
+
+  <!-- ── INVENTORY ─────────────────────────────── -->
+  <div id="tab-inventory" class="tab-content hidden">
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+      <div class="glass-parchment rounded-xl border border-[#d4b080]/60 p-5">
+        <h2 class="font-display text-lg text-[#6b3410] mb-3 pb-2 border-b border-[#d4b080]">🌿 Ingredients</h2>
+        <div id="inventory-ingredients" class="space-y-2"></div>
+      </div>
+      <div class="glass-parchment rounded-xl border border-[#d4b080]/60 p-5">
+        <h2 class="font-display text-lg text-[#6b3410] mb-3 pb-2 border-b border-[#d4b080]">🧪 Potions</h2>
+        <div id="inventory-potions" class="space-y-3"></div>
+      </div>
+    </div>
+  </div>
+
+</main>
+
+
+<!-- ════════════════ CREATURE MODAL ════════════════ -->
+<div id="creature-modal" class="hidden fixed inset-0 z-50 flex flex-col items-center justify-center"
+     style="background:rgba(5,2,12,0.92); backdrop-filter:blur(8px);">
+  <div class="relative w-full max-w-2xl mx-4 rounded-2xl overflow-hidden border-2 border-[#9b6fd4]/60 shadow-2xl"
+       style="box-shadow:0 0 60px rgba(120,60,200,0.4);">
+    <video id="creature-video" autoplay muted playsinline class="w-full"
+           style="display:block;"
+           onended="this.pause(); this.currentTime=this.duration;">
+      <source src="assets/creature.mp4" type="video/mp4"/>
+    </video>
+    <!-- Overlay text -->
+    <div class="absolute inset-0 flex flex-col justify-end p-6"
+         style="background:linear-gradient(to top,rgba(5,2,12,0.85) 0%,transparent 60%);">
+      <p class="font-display text-xs tracking-[0.3em] text-[#9b6fd4] mb-1">✦ VISION ✦</p>
+      <p id="creature-caption" class="font-display text-lg text-[#f5e6c8] drop-shadow-lg"></p>
+      <p id="creature-sub" class="text-sm text-[#d4b080] italic mt-1"></p>
+    </div>
+  </div>
+  <button onclick="closeCreature()"
+          class="mt-5 px-8 py-2.5 font-display text-sm tracking-widest rounded border-2 border-[#9b6fd4] text-[#f5e6c8] hover:bg-[#9b6fd4]/30 transition-all">
+    ✦ CLOSE ✦
+  </button>
+</div>
+
+<!-- ════════════════════════════════════════════════════════════
+     GAME SCRIPT
+═══════════════════════════════════════════════════════════════ -->
+<script>
+
+// ╔══════════════════════════════════════════════════════════════╗
+// ║  VIDEO MOOD — maps tab/location to background filter        ║
+// ╚══════════════════════════════════════════════════════════════╝
+
+// Each mood defines how the looping video looks for that scene.
+// The same single video becomes three different locations through CSS filters.
+const MOODS = {
+  workshop:  { filter: 'brightness(0.82) saturate(1.05)',                          overlay: 'rgba(22,8,2,0.48)'  },
+  glade:     { filter: 'hue-rotate(28deg) brightness(1.0) saturate(1.6)',          overlay: 'rgba(8,18,4,0.40)'  },
+  ruins:     { filter: 'hue-rotate(198deg) brightness(0.42) saturate(0.35)',       overlay: 'rgba(3,5,22,0.62)'  },
+  journal:   { filter: 'sepia(0.55) brightness(0.72)',                             overlay: 'rgba(18,10,4,0.60)' },
+  inventory: { filter: 'brightness(0.78) saturate(0.88)',                          overlay: 'rgba(22,8,2,0.50)'  },
+};
+
+function setMood(key) {
+  const m = MOODS[key] || MOODS.workshop;
+  document.getElementById('bg-video').style.filter   = m.filter;
+  document.getElementById('bg-overlay').style.background = m.overlay;
+}
+
+// ╔══════════════════════════════════════════════════════════════╗
+// ║  GAME DATA                                                   ║
+// ╚══════════════════════════════════════════════════════════════╝
+
+const DATA = {
+
+  ingredients: {
+    emberRoot:       { id:'emberRoot',       name:'Ember Root',        emoji:'🌱', desc:'A root warm to the touch, smelling faintly of woodsmoke.',              foundAt:['workshop'] },
+    hearthberry:     { id:'hearthberry',     name:'Hearthberry',       emoji:'🫐', desc:'Small crimson berries that spark faintly in the dark.',                 foundAt:['workshop'] },
+    verdantLeaf:     { id:'verdantLeaf',     name:'Verdant Leaf',      emoji:'🍃', desc:'A vibrant leaf that never seems to wilt.',                              foundAt:['workshop','sunriseGlade'] },
+    moonpetal:       { id:'moonpetal',       name:'Moonpetal',         emoji:'🌸', desc:'A silver-white petal that only blooms under moonlight.',                foundAt:['sunriseGlade'] },
+    crystalDew:      { id:'crystalDew',      name:'Crystal Dew',       emoji:'💧', desc:'Morning dew collected from enchanted spider webs.',                     foundAt:['sunriseGlade'] },
+    sunstoneDust:    { id:'sunstoneDust',    name:'Sunstone Dust',     emoji:'✨', desc:'Ground sunstone that hums with trapped sunlight.',                      foundAt:['sunriseGlade'] },
+    shadowMoss:      { id:'shadowMoss',      name:'Shadow Moss',       emoji:'🌑', desc:'Dark moss that grows only where sunlight cannot reach.',                foundAt:['oldRuins'] },
+    bogSpore:        { id:'bogSpore',        name:'Bog Spore',         emoji:'🍄', desc:'Glowing mushroom spores from the ruins\' lower chambers.',              foundAt:['oldRuins'] },
+    starweaveThread: { id:'starweaveThread', name:'Starweave Thread',  emoji:'🕸️', desc:'Gossamer threads that shimmer like captured starlight.',               foundAt:['oldRuins'] },
+    ancientResin:    { id:'ancientResin',    name:'Ancient Resin',     emoji:'🪨', desc:'Amber-gold resin from trees that no longer grow.',                      foundAt:['oldRuins'] },
+  },
+
+  potions: {
+    elixirOfSight: {
+      id:'elixirOfSight', name:'Elixir of Sight', emoji:'👁️',
+      desc:'Opens the inner eye to see what is hidden.',
+      recipe:['moonpetal','crystalDew','sunstoneDust'],
+      brewMsg:'The brew swirls into a luminous blue. Your eyes tingle just looking at it.',
+      useMsg:'A cold clarity washes over you. Colors sharpen. Edges glow. You can see the world\'s seams.',
+      effects:{ flags:['hasSight'], journal:['whatTheSightRevealed','prophecyFragment'] },
+    },
+    emberbloodBrew: {
+      id:'emberbloodBrew', name:'Emberblood Brew', emoji:'🔥',
+      desc:'Fills the veins with warmth and quiet courage.',
+      recipe:['emberRoot','hearthberry'],
+      brewMsg:'The mixture ignites with a deep amber glow, settling into a slow burn.',
+      useMsg:'Warmth spreads from your chest outward. The cold no longer troubles you.',
+      effects:{ flags:['hasEmberblood'], journal:[] },
+    },
+    veilOfShadows: {
+      id:'veilOfShadows', name:'Veil of Shadows', emoji:'🌫️',
+      desc:'Parts the darkness to reveal what hides within.',
+      recipe:['shadowMoss','starweaveThread','bogSpore'],
+      brewMsg:'The brew darkens to midnight black, then shifts to a deep violet shimmer.',
+      useMsg:'The shadows around you thin like smoke. You see shapes in the dark that were not there before.',
+      effects:{ flags:['hasVeil'], journal:['beneathTheEastWall'] },
+    },
+    morningsPromise: {
+      id:'morningsPromise', name:"Morning's Promise", emoji:'🌿',
+      desc:'A gentle restorative, smelling of dawn and rain.',
+      recipe:['moonpetal','verdantLeaf','crystalDew'],
+      brewMsg:'The potion shimmers gold-green, catching the light like a dewdrop.',
+      useMsg:'Fatigue melts away. Your spirit lifts like morning fog. You feel whole again.',
+      effects:{ flags:['hasMorning'], journal:['gatheringAtSunrise'] },
+    },
+    dreamTincture: {
+      id:'dreamTincture', name:'Dream Tincture', emoji:'🌙',
+      desc:'Carries the drinker between waking and dreaming.',
+      recipe:['starweaveThread','moonpetal','hearthberry'],
+      brewMsg:'The brew swirls with silver and deep blue, like a night sky in a bottle.',
+      useMsg:'The potion glows, then shimmers — and something small and radiant rises from the bottle, blinking her wide eyes at you for the very first time.',
+      effects:{ flags:['hasDreamed'], journal:['silverForest'] },
+    },
+    lucksFavor: {
+      id:'lucksFavor', name:"Luck's Favor", emoji:'🍀',
+      desc:'Bends fortune gently toward the drinker.',
+      recipe:['sunstoneDust','ancientResin','verdantLeaf'],
+      brewMsg:'Golden sparks dance through the brew before settling into a warm glowing liquid.',
+      useMsg:'You feel a lightness in your step, as if the world is leaning just slightly your way.',
+      effects:{ flags:['hasLuck'], journal:[] },
+    },
+  },
+
+  locations: {
+    workshop: {
+      id:'workshop', name:'The Workshop', emoji:'🏠', mood:'workshop',
+      baseDesc:'Your workshop is cozy and warm. Shelves of glass jars line every wall, and a well-worn cauldron sits above the hearth. The smell of old herbs and wood smoke fills the air.',
+      conditionalDesc:{
+        hasEmberblood:'The embers in your hearth burn with unusual brightness, tracing golden patterns on the ceiling like slow-moving constellations.',
+        hasDreamed:'You notice small details you\'d missed before — tiny runes scratched into the cauldron\'s rim, half-hidden under years of soot.',
+      },
+      ingredients:['emberRoot','hearthberry','verdantLeaf'],
+      gatherFlavour:'You search the workshop shelves and dried herb bundles.',
+      travelTo:['sunriseGlade','oldRuins'],
+    },
+    sunriseGlade: {
+      id:'sunriseGlade', name:'Sunrise Glade', emoji:'🌄', mood:'glade',
+      baseDesc:'A quiet meadow on the hill\'s eastern slope, where the first light always lingers longest. Wildflowers nod in a breeze too gentle to feel. The air here tastes faintly of honey.',
+      conditionalDesc:{
+        hasSight:'With your Elixir of Sight still working, you can see tiny motes of light drifting between the flower stems — fae-fire, your grandmother would have called them.',
+        hasLuck:'A hidden cluster of Moonpetals glows near the twisted oak at the glade\'s edge. You never would have found them without fortune on your side.',
+      },
+      ingredients:['moonpetal','crystalDew','sunstoneDust','verdantLeaf'],
+      gatherFlavour:'You move through the glade with careful hands, gathering what the morning offers.',
+      travelTo:['workshop','oldRuins'],
+    },
+    oldRuins: {
+      id:'oldRuins', name:'The Old Ruins', emoji:'🏚️', mood:'ruins',
+      baseDesc:'Crumbling stone arches lean against each other like tired giants. Moss and shadow fill the spaces between. Something ancient breathes here — patient, watchful, waiting for the right question.',
+      conditionalDesc:{
+        hasVeil:'The Veil of Shadows clings to your sight. Carved glyphs emerge from the stones, suddenly legible: <em>"Below the eldest stone, truth waits in darkness and silence."</em>',
+        hasSight:'A ghostly outline of a doorway shimmers in the northern wall. It was not there before — or perhaps it always was, and you simply couldn\'t see it.',
+      },
+      ingredients:['shadowMoss','bogSpore','starweaveThread','ancientResin'],
+      gatherFlavour:'You pick through the ruins carefully, lifting stones and peering into crevices.',
+      travelTo:['workshop','sunriseGlade'],
+    },
+  },
+
+  journal: [
+    { id:'oldWitchWarning', title:"The Old Witch's Warning", emoji:'📖', date:'Third Day of Hearthmonth', alwaysVisible:true, unlockRequires:null,
+      content:`The old witch Maren came to my door before dawn, her lantern already guttering. She pressed a folded paper into my hands before I could speak.\n\n"Three seals," she said. "Sight, Shadow, and Dream. Each one must be opened before the Prophecy can be read whole. You'll know them when you brew them."\n\nShe was gone before I could ask what prophecy, or whose. The paper she gave me contained only a drawing: three overlapping circles, each one containing a different eye.\n\nI've been in this workshop long enough. It's time to start looking.` },
+    { id:'dreamHalfRemembered', title:'A Dream Half-Remembered', emoji:'🌙', date:'Fourth Day of Hearthmonth', alwaysVisible:true, unlockRequires:null,
+      content:`I woke at three in the morning with the smell of silver flowers thick in my nose. Not real flowers — something deeper than that, like the idea of flowers distilled into scent alone.\n\nIn the dream (if it was a dream), I walked a forest path where every leaf was made of spun moonlight. Someone walked beside me, but when I turned to look, they were always just past the edge of my vision.\n\nThey said something. I wrote it down before I fell back asleep:\n\n*"The thread that binds the waking to the dreaming is thinner than a hair. It only takes the right hand to pluck it."*\n\nI don't know what that means. Yet.` },
+    { id:'gatheringAtSunrise', title:'The Gathering at Sunrise', emoji:'🌸', date:'Fifth Day of Hearthmonth', alwaysVisible:false, unlockRequires:'morningsPromise',
+      content:`Morning's Promise works. I know that now not just in theory but in the bones of my hands, which ached yesterday and do not ache today.\n\nI went to the glade early, while the mist was still low. The Moonpetals were opening — I've never seen them do that; I always thought they only bloomed at night. But there they were, tilting their faces toward a sun that hadn't quite arrived yet.\n\nSomething about the glade at dawn feels like a threshold. A place that is not quite one thing or another. I stood there longer than I meant to, and when I finally left, I felt like I was carrying something I hadn't arrived with.\n\nThe flowers are trying to tell us something. I'm going to start listening.` },
+    { id:'beneathTheEastWall', title:'Beneath the East Wall', emoji:'🏚️', date:'Sixth Day of Hearthmonth', alwaysVisible:false, unlockRequires:'veilOfShadows',
+      content:`The Veil of Shadows is remarkable. More than I expected.\n\nI drank it in the ruins, standing at the center of what was once a great hall. The world went dark for just a moment — and then it came back different. Quieter. More itself.\n\nThe glyphs on the east wall were suddenly readable. I've passed them a dozen times and seen only worn stone. Tonight they spoke plainly:\n\n*"Below the eldest stone, truth waits in darkness and silence. Bring the three who see — Sight, Shadow, Dream — and the Prophecy will open like a morning flower."*\n\nThe eldest stone. That would be the great flat slab near the northern arch. I didn't try to move it tonight. But I know where to go next.` },
+    { id:'whatTheSightRevealed', title:'What the Sight Revealed', emoji:'👁️', date:'Sixth Day of Hearthmonth', alwaysVisible:false, unlockRequires:'elixirOfSight',
+      content:`I brewed the Elixir of Sight this afternoon and drank it at the window, watching the street.\n\nFor twenty minutes, I saw the world the way birds must. Colors inside colors. The heat of living things visible as soft amber coronas. And everywhere, threading through it all like veins — lines of quiet force that connect things to other things.\n\nThe Sunrise Glade glows brightest on the map in my mind. And the ruins pulse with something deep and deliberate, like a heartbeat slowed nearly to stillness.\n\nI also saw something in my own hands: faint traceries of light running along the tendons. My grandmother had them too, she said. She called it the gift of the craft.\n\nI understand now why it's a gift.` },
+    { id:'silverForest', title:'The Silver Forest', emoji:'🌫️', date:'Seventh Day of Hearthmonth', alwaysVisible:false, unlockRequires:'dreamTincture',
+      content:`The Dream Tincture took me somewhere.\n\nI was in the workshop one moment, and then I was in a forest where every leaf was hammered silver and the air tasted like starlight. The path was clear and soft underfoot, and I walked it without fear.\n\nThe figure was there again — the same one from my earlier dream. This time they turned, and I almost saw their face. Almost.\n\n"You're further along than you think," they said. "The three seals are nearly open. When the last one breaks, come to the eldest stone. Come with clear eyes and an open heart."\n\nThen they pressed something into my hand — a small, warm stone, smooth as water. When I woke, my palm was empty. But it was warm.` },
+    { id:'prophecyFragment', title:'The Prophecy Fragment', emoji:'📜', date:'Seventh Day of Hearthmonth', alwaysVisible:false, unlockRequires:'elixirOfSight',
+      content:`I found a piece of paper tucked behind the loose stone by the workshop hearth. I've checked behind that stone a hundred times. It was not there before.\n\nThe handwriting is not mine. But I recognize it anyway, the way you recognize a voice before you place the name.\n\n*"The one who opens all three seals will stand at the crossroads of the worlds — not witch, not mortal, not spirit — something new. The Prophecy is not a warning. It is an invitation.*\n\n*What is brewed with care and tended with hope becomes, in the end, a door.*\n\n*You are the key."*\n\nI read it three times. Then I put the kettle on, because some moments require tea.` },
+    { id:'allBrewedSecret', title:'A Recipe Older Than Memory', emoji:'✨', date:'Eighth Day of Hearthmonth', alwaysVisible:false, unlockRequires:'allPotions',
+      content:`I've brewed all six. I didn't set out to, but here we are.\n\nThere's a recipe that doesn't appear in any book. Maren didn't give it to me. It arrived in my mind this morning the way some knowledge does — not learned but *remembered*, as if I always knew it and simply hadn't needed it until now.\n\nSix potions, six kinds of seeing. Sight and Shadow and Dream are the three seals. But the other three — Ember, Morning, and Luck — those are the *frame* the seals fit into.\n\nThe craft isn't just useful. It isn't just beautiful.\n\nIt's a language.\n\nAnd I am, slowly, learning to speak it.` },
+  ],
+};
+
+// ╔══════════════════════════════════════════════════════════════╗
+// ║  GAME STATE                                                  ║
+// ╚══════════════════════════════════════════════════════════════╝
+
+const DEFAULT_STATE = {
+  inventory:      { ingredients:{ emberRoot:1, hearthberry:2, verdantLeaf:1 }, potions:{} },
+  cauldron:       [],
+  currentLocation:'workshop',
+  usedPotions:    [],
+  brewedPotions:  [],
+  unlockedJournal:['oldWitchWarning','dreamHalfRemembered'],
+  expandedJournal:[],
+  flags:          {},
+  visitCount:     {},
+};
+
+let state = deepClone(DEFAULT_STATE);
+function deepClone(o) { return JSON.parse(JSON.stringify(o)); }
+
+// ╔══════════════════════════════════════════════════════════════╗
+// ║  SAVE / LOAD / NEW                                           ║
+// ╚══════════════════════════════════════════════════════════════╝
+
+// Dev shortcut — fills every ingredient to 5 for quick testing
+function devFill() {
+  Object.keys(DATA.ingredients).forEach(id => { state.inventory.ingredients[id] = 5; });
+  render();
+  addLog('Dev: all ingredients filled ×5.', '⚗️');
+}
+
+function saveGame() { localStorage.setItem('pp_v1_save', JSON.stringify(state)); addLog('Game saved.','💾'); }
+
+function loadGame() {
+  const raw = localStorage.getItem('pp_v1_save');
+  if (!raw) { addLog('No saved game found.','❌'); return; }
+  try { state = JSON.parse(raw); render(); addLog('Game loaded.','💾'); }
+  catch(e) { addLog('Save file corrupted — starting fresh.','❌'); newGame(true); }
+}
+
+function newGame(skipConfirm=false) {
+  if (!skipConfirm && !confirm('Start a new game? All progress will be lost.')) return;
+  localStorage.removeItem('pp_v1_save');
+  state = deepClone(DEFAULT_STATE);
+  render();
+  addLog('A new adventure begins. Your cauldron is waiting.','🌟');
+}
+
+// ╔══════════════════════════════════════════════════════════════╗
+// ║  CAULDRON                                                    ║
+// ╚══════════════════════════════════════════════════════════════╝
+
+function toggleCauldronIngredient(ingId) {
+  if (state.cauldron.includes(ingId)) {
+    state.cauldron = state.cauldron.filter(id => id !== ingId);
+  } else {
+    if (state.cauldron.length >= 3) { addLog('The cauldron holds at most 3 ingredients.','🪣'); return; }
+    if ((state.inventory.ingredients[ingId]||0) < 1) { addLog(`You have no ${DATA.ingredients[ingId].name}.`,'❌'); return; }
+    state.cauldron.push(ingId);
+  }
+  renderWorkshop();
+}
+
+function clearCauldron() { state.cauldron = []; renderWorkshop(); }
+
+function mixPotion() {
+  if (state.cauldron.length === 0) { addLog('Add some ingredients to the cauldron first.','🪣'); return; }
+
+  const el = document.getElementById('cauldron-el');
+  el.classList.add('brew-shake');
+  setTimeout(() => el.classList.remove('brew-shake'), 700);
+
+  const sorted  = [...state.cauldron].sort().join(',');
+  const matched = Object.values(DATA.potions).find(p => [...p.recipe].sort().join(',') === sorted);
+
+  if (matched) {
+    const needed  = {};
+    state.cauldron.forEach(id => { needed[id] = (needed[id]||0)+1; });
+    const hasAll  = Object.entries(needed).every(([id,n]) => (state.inventory.ingredients[id]||0) >= n);
+    if (!hasAll) { addLog('Not enough ingredients in your stores.','❌'); return; }
+
+    Object.entries(needed).forEach(([id,n]) => { state.inventory.ingredients[id] -= n; });
+    state.inventory.potions[matched.id] = (state.inventory.potions[matched.id]||0) + 1;
+    if (!state.brewedPotions.includes(matched.id)) state.brewedPotions.push(matched.id);
+
+    // "All potions brewed" achievement
+    if (Object.keys(DATA.potions).every(id => state.brewedPotions.includes(id))) {
+      if (!state.unlockedJournal.includes('allBrewedSecret')) {
+        state.unlockedJournal.push('allBrewedSecret');
+        setTimeout(() => addLog('A new page has appeared in your journal...','📖'), 400);
+      }
+    }
+
+    state.cauldron = [];
+    addLog(`${matched.emoji} ${matched.name} brewed! ${matched.brewMsg}`,'✨');
+    brewSuccess(matched);
+  } else {
+    // No recipe match — ingredients not consumed
+    addLog('The brew fizzles. Those ingredients don\'t combine into anything known. (Ingredients returned.)','💨');
+    state.cauldron = [];
+  }
+
+  saveGame(); render();
+}
+
+// ╔══════════════════════════════════════════════════════════════╗
+// ║  DRINKING POTIONS                                            ║
+// ╚══════════════════════════════════════════════════════════════╝
+
+// ── Brew success — switch straight to Inventory ──────────────
+function brewSuccess(potion) {
+  setTimeout(() => switchTab('inventory'), 600);
+}
+
+// ── Luma — persistent header sprite ─────────────────────────
+
+const LUMA_WHISPERS = [
+  'A pinch of moonpetal makes everything clearer.',
+  'The ruins breathe. I\'ve felt it since before you arrived.',
+  'Hearthberries taste like courage. Did you know that?',
+  'Something is written beneath the eldest stone. I\'ve seen it.',
+  'The glade is brightest just before the sun clears the hill.',
+  'You are closer to the Prophecy than you think.',
+  'Starweave Thread hums when held near a dreaming mind.',
+  'Every potion has a feeling it wants to give you. Listen.',
+  'I lived in the brew long before you poured it.',
+];
+
+function summonLuma() {
+  const sprite = document.getElementById('luma-sprite');
+  sprite.classList.remove('hidden');
+  // Trigger appear animation by briefly removing and re-adding float class
+  sprite.style.animation = 'lumaAppear 0.7s cubic-bezier(0.34,1.56,0.64,1) forwards';
+  setTimeout(() => {
+    sprite.style.animation = 'lumaFloat 3s ease-in-out infinite, lumaGlow 3s ease-in-out infinite';
+  }, 720);
+  addLog('Luma has emerged from the brew. She lives in your workshop now.', '🧚');
+}
+
+function lumaWhisper() {
+  const whisper = LUMA_WHISPERS[Math.floor(Math.random() * LUMA_WHISPERS.length)];
+  addLog(`Luma whispers: "${whisper}"`, '🧚');
+}
+
+// ── Creature reveal ──────────────────────────────────────────
+function showCreature(caption, sub, src = 'assets/creature.mp4') {
+  const modal = document.getElementById('creature-modal');
+  const video = document.getElementById('creature-video');
+  document.getElementById('creature-caption').textContent = caption;
+  document.getElementById('creature-sub').textContent     = sub;
+  // Swap video source if different
+  if (video.querySelector('source').src !== new URL(src, location.href).href) {
+    video.querySelector('source').src = src;
+    video.load();
+  }
+  modal.classList.remove('hidden');
+  video.currentTime = 0;
+  video.playbackRate = 0.6;
+  video.play();
+}
+
+function closeCreature() {
+  document.getElementById('creature-modal').classList.add('hidden');
+  document.getElementById('creature-video').pause();
+}
+
+function drinkPotion(potionId) {
+  const potion = DATA.potions[potionId];
+  if (!potion || (state.inventory.potions[potionId]||0) < 1) { addLog('You don\'t have that potion.','❌'); return; }
+
+  state.inventory.potions[potionId]--;
+
+  if (!state.usedPotions.includes(potionId)) {
+    state.usedPotions.push(potionId);
+    potion.effects.flags.forEach(f => { state.flags[f] = true; });
+    let unlocked = 0;
+    potion.effects.journal.forEach(id => { if (!state.unlockedJournal.includes(id)) { state.unlockedJournal.push(id); unlocked++; } });
+    if (unlocked > 0) setTimeout(() => addLog(`${unlocked} new journal ${unlocked>1?'entries':'entry'} unlocked!`,'📖'), 350);
+    // Dream Tincture reveals the creature on first drink
+    if (potionId === 'dreamTincture') {
+      setTimeout(() => {
+        summonLuma();
+        showCreature('Luma — The Brew Sprite', 'She has lived inside the potions all along. Now she finally has a reason to emerge.');
+      }, 800);
+    }
+    if (potionId === 'elixirOfSight') {
+      setTimeout(() => showCreature('The Seeing Stone', 'The crystal holds every path not yet taken. Look closely — one of them is yours.', 'assets/crystalball.mp4'), 800);
+    }
+    if (potionId === 'emberbloodBrew') {
+      setTimeout(() => showCreature('Emberblood', 'The fire in your veins is not yours alone. Something ancient lit this flame long before you were born.', 'assets/emberblood.mp4'), 800);
+    }
+  } else {
+    addLog(`You've already felt the full effect of ${potion.name}. Drinking again is pleasant, but nothing new stirs.`, potion.emoji);
+  }
+
+  addLog(potion.useMsg, potion.emoji);
+  saveGame(); render();
+}
+
+// ╔══════════════════════════════════════════════════════════════╗
+// ║  EXPLORATION                                                 ║
+// ╚══════════════════════════════════════════════════════════════╝
+
+function gatherIngredients() {
+  const loc  = DATA.locations[state.currentLocation];
+  const pool = loc.ingredients;
+  const min  = state.flags.hasLuck ? 2 : 1;
+  const max  = state.flags.hasLuck ? 4 : 3;
+  const count = Math.floor(Math.random() * (max - min + 1)) + min;
+  const gathered = {};
+  for (let i = 0; i < count; i++) {
+    const id = pool[Math.floor(Math.random() * pool.length)];
+    gathered[id] = (gathered[id]||0) + 1;
+  }
+  Object.entries(gathered).forEach(([id,n]) => { state.inventory.ingredients[id] = (state.inventory.ingredients[id]||0)+n; });
+  state.visitCount[state.currentLocation] = (state.visitCount[state.currentLocation]||0)+1;
+
+  const summary = Object.entries(gathered).map(([id,n]) => `${DATA.ingredients[id].emoji} ${DATA.ingredients[id].name} ×${n}`).join(', ');
+  addLog(`Gathered: ${summary}${state.flags.hasLuck ? ' ✦ (Luck\'s Favor helped!)' : ''}`, '🌿');
+  saveGame(); renderInventory(); renderWorkshop(); renderExplore();
+}
+
+function travelTo(locationId) {
+  if (locationId === state.currentLocation) return;
+  state.currentLocation = locationId;
+  state.visitCount[locationId] = (state.visitCount[locationId]||0)+1;
+  const loc = DATA.locations[locationId];
+  setMood(loc.mood);
+  addLog(`You travel to ${loc.name}.`, loc.emoji);
+  saveGame();
+  // Map stays open — only update the hidden stubs, no full re-render
+}
+
+// ╔══════════════════════════════════════════════════════════════╗
+// ║  JOURNAL                                                     ║
+// ╚══════════════════════════════════════════════════════════════╝
+
+function toggleJournal(entryId) {
+  const idx = state.expandedJournal.indexOf(entryId);
+  if (idx >= 0) state.expandedJournal.splice(idx,1);
+  else state.expandedJournal.push(entryId);
+  renderJournal();
+}
+
+// ╔══════════════════════════════════════════════════════════════╗
+// ║  LOG                                                         ║
+// ╚══════════════════════════════════════════════════════════════╝
+
+function addLog(msg, icon='✦') {
+  const log = document.getElementById('action-log');
+  const div = document.createElement('div');
+  div.className = 'text-xs text-[#d4b080] fade-up border-b border-white/5 pb-0.5';
+  div.textContent = `${icon}  ${msg}`;
+  log.insertBefore(div, log.firstChild);
+  while (log.children.length > 30) log.removeChild(log.lastChild);
+}
+
+function clearLog() { document.getElementById('action-log').innerHTML = ''; }
+
+// ╔══════════════════════════════════════════════════════════════╗
+// ║  RENDERING                                                   ║
+// ╚══════════════════════════════════════════════════════════════╝
+
+function render() { renderWorkshop(); renderExplore(); renderJournal(); renderInventory(); }
+
+// ── Workshop ─────────────────────────────────────────────────
+function renderWorkshop() {
+  const shelf = document.getElementById('workshop-ingredients');
+  shelf.innerHTML = '';
+
+  Object.values(DATA.ingredients).forEach(ing => {
+    const count    = state.inventory.ingredients[ing.id] || 0;
+    const selected = state.cauldron.includes(ing.id);
+    const full     = state.cauldron.length >= 3 && !selected;
+    const disabled = count === 0 || full;
+
+    const card = document.createElement('div');
+    card.className = `ing-card rounded-lg border p-3 ${selected ? 'ing-selected border-[#d4a73a] bg-[#fdf3dc]/90' : 'border-[#d4b080]/60 bg-[#fdf3dc]/75'} ${disabled ? 'ing-disabled' : ''}`;
+    card.innerHTML = `
+      <div class="flex items-center gap-2">
+        <span class="text-2xl leading-none">${ing.emoji}</span>
+        <div class="flex-1 min-w-0">
+          <p class="font-display text-xs text-[#5c3018] leading-snug truncate">${ing.name}</p>
+          <p class="text-xs text-[#8b6040]">×${count}</p>
+        </div>
+        ${selected ? '<span class="text-[#d4a73a] font-bold">✓</span>' : ''}
+      </div>`;
+    if (!disabled) card.onclick = () => toggleCauldronIngredient(ing.id);
+    shelf.appendChild(card);
+  });
+
+  // Cauldron contents
+  const emptyMsg = document.getElementById('cauldron-empty-msg');
+  const itemsDiv = document.getElementById('cauldron-items');
+  const hintDiv  = document.getElementById('cauldron-hint');
+  itemsDiv.innerHTML = '';
+
+  if (state.cauldron.length === 0) {
+    emptyMsg.style.display = 'block';
+    hintDiv.textContent = '';
+  } else {
+    emptyMsg.style.display = 'none';
+    state.cauldron.forEach((id, idx) => {
+      const span = document.createElement('span');
+      span.className = 'text-2xl cursor-pointer hover:opacity-60 transition-opacity leading-none';
+      span.title = `${DATA.ingredients[id].name} — click to remove`;
+      span.textContent = DATA.ingredients[id].emoji;
+      span.onclick = () => { state.cauldron.splice(idx,1); renderWorkshop(); };
+      itemsDiv.appendChild(span);
+    });
+    const preview = getRecipePreview();
+    hintDiv.textContent = preview.type === 'match' ? `→ ${preview.potion.name}` : preview.type === 'partial' ? 'Partial match…' : '';
+  }
+
+  renderRecipeHints();
+}
+
+function getRecipePreview() {
+  const sorted = [...state.cauldron].sort().join(',');
+  for (const p of Object.values(DATA.potions)) if ([...p.recipe].sort().join(',') === sorted) return { type:'match', potion:p };
+  for (const p of Object.values(DATA.potions)) if (state.cauldron.every(id => p.recipe.includes(id))) return { type:'partial', potion:p };
+  return { type:'none' };
+}
+
+function renderRecipeHints() {
+  const div = document.getElementById('recipe-hints');
+  div.innerHTML = '';
+  Object.values(DATA.potions).forEach(p => {
+    const brewed = state.brewedPotions.includes(p.id);
+    const row = document.createElement('div');
+    row.className = 'flex items-center gap-1.5 text-xs';
+    row.innerHTML = `<span>${p.emoji}</span><span class="text-[#6b3410] ${brewed?'line-through opacity-50':''}">${p.name}</span><span class="text-[#9a7050] ml-1">${p.recipe.map(id=>DATA.ingredients[id].emoji).join('+')}</span>${brewed?'<span class="text-green-700 ml-auto">✓</span>':''}`;
+    div.appendChild(row);
+  });
+}
+
+// ── Explore ──────────────────────────────────────────────────
+function renderExplore() {
+  const loc = DATA.locations[state.currentLocation];
+
+  // (hero banner now lives inside the map panel — no separate render needed)
+
+  // Description + conditional extras
+  const extras = Object.entries(loc.conditionalDesc)
+    .filter(([flag]) => state.flags[flag])
+    .map(([,text]) => `<p class="text-sm leading-relaxed text-[#c4a8e8] italic mt-2">✧ ${text}</p>`)
+    .join('');
+
+  document.getElementById('location-display').innerHTML = `
+    <div class="glass-parchment rounded-xl border border-[#d4b080]/60 p-5 fade-up">
+      <p class="text-sm leading-relaxed text-[#3a2010]">${loc.baseDesc}</p>
+      ${extras}
+      <div class="border-t border-[#d4b080] pt-4 mt-4">
+        <p class="text-xs text-[#7a5030] italic mb-3">${loc.gatherFlavour}</p>
+        <button onclick="gatherIngredients()"
+                class="px-5 py-2 font-display text-sm tracking-wide rounded border-2 border-[#7a5028] text-[#3a1808] hover:border-[#d4a73a] transition-all shadow"
+                style="background:linear-gradient(135deg,#e8d5a3,#d4c090);">
+          🌿 Gather Ingredients
+        </button>
+      </div>
+    </div>`;
+
+  // Travel buttons
+  const travelDiv = document.getElementById('travel-options');
+  travelDiv.innerHTML = '';
+  // All three locations shown on the map (current + travel targets)
+  const allLocIds = [state.currentLocation, ...loc.travelTo];
+  allLocIds.forEach(destId => {
+    const dest      = DATA.locations[destId];
+    const isCurrent = destId === state.currentLocation;
+    const btn       = document.createElement('button');
+    btn.className = 'flex flex-col items-center gap-1 cursor-pointer transition-transform hover:scale-110 active:scale-95 select-none';
+    btn.style.cssText = 'background:none; border:none; padding:0;';
+    const pinStyle = isCurrent
+      ? 'text-shadow:0 0 12px rgba(255,210,80,1),0 0 4px rgba(255,180,0,0.8);'
+      : 'text-shadow:0 2px 6px rgba(0,0,0,0.6);';
+    const labelStyle = isCurrent
+      ? 'text-shadow:0 0 8px rgba(255,220,100,0.9),0 1px 2px rgba(255,255,255,0.5); color:#2a1200;'
+      : 'text-shadow:0 1px 4px rgba(255,255,255,0.5),0 2px 6px rgba(0,0,0,0.4); color:#2a1200;';
+    btn.innerHTML = `
+      <span class="text-4xl leading-none" style="${pinStyle}">${dest.emoji}</span>
+      <p class="font-display text-xs tracking-wide" style="${labelStyle}">${dest.name}</p>
+      ${isCurrent ? `<span style="color:#c47800;font-size:10px;font-family:'Cinzel',serif;text-shadow:0 0 6px rgba(255,200,50,0.8);">★ Here</span>` : ''}`;
+    btn.onclick = () => travelTo(destId);
+    travelDiv.appendChild(btn);
+  });
+
+  document.getElementById('location-name-badge').textContent = loc.name;
+}
+
+// ── Journal ──────────────────────────────────────────────────
+function renderJournal() {
+  const container = document.getElementById('journal-entries');
+  container.innerHTML = '';
+  DATA.journal.forEach(entry => {
+    const visible  = entry.alwaysVisible || state.unlockedJournal.includes(entry.id);
+    const expanded = state.expandedJournal.includes(entry.id);
+    const card = document.createElement('div');
+    card.className = 'glass-parchment rounded-xl border border-[#d4b080]/60 p-4 fade-up transition-all';
+
+    if (visible) {
+      const formatted = entry.content.split('\n\n')
+        .map(p => `<p class="mb-2">${p.replace(/\*\*(.*?)\*\*/g,'<strong>$1</strong>').replace(/\*(.*?)\*/g,'<em>$1</em>')}</p>`)
+        .join('');
+      card.innerHTML = `
+        <div class="flex items-start gap-3 cursor-pointer hover:opacity-80 transition-opacity" onclick="toggleJournal('${entry.id}')">
+          <span class="text-2xl leading-none">${entry.emoji}</span>
+          <div class="flex-1 min-w-0">
+            <h3 class="font-display text-sm text-[#5c3018] leading-snug">${entry.title}</h3>
+            <p class="text-xs text-[#8b6040] mt-0.5">${entry.date}</p>
+          </div>
+          <span class="text-[#8b6040] text-xs mt-1 shrink-0">${expanded?'▲':'▼'}</span>
+        </div>
+        ${expanded ? `<div class="mt-3 pt-3 border-t border-[#d4b080] text-sm leading-relaxed text-[#3a2010] fade-up">${formatted}</div>` : ''}`;
+    } else {
+      let hint = 'Unknown';
+      if (entry.unlockRequires === 'allPotions') hint = 'Brew all six potions';
+      else if (entry.unlockRequires && DATA.potions[entry.unlockRequires]) hint = `Drink ${DATA.potions[entry.unlockRequires].name}`;
+      card.innerHTML = `
+        <div class="flex items-start gap-3 opacity-55">
+          <span class="text-2xl leading-none">🔒</span>
+          <div class="flex-1 min-w-0">
+            <h3 class="font-display text-sm text-[#5c3018] leading-snug journal-blur">${entry.title}</h3>
+            <p class="text-xs text-[#8b6040] mt-1 italic">Unlock by: ${hint}</p>
+          </div>
+        </div>`;
+    }
+    container.appendChild(card);
+  });
+}
+
+// ── Inventory ─────────────────────────────────────────────────
+function renderInventory() {
+  const ingDiv = document.getElementById('inventory-ingredients');
+  ingDiv.innerHTML = '';
+  const ownedIngs = Object.values(DATA.ingredients).filter(i => (state.inventory.ingredients[i.id]||0) > 0);
+  if (!ownedIngs.length) {
+    ingDiv.innerHTML = '<p class="text-sm text-[#7a5030] italic">Your stores are empty. Go explore!</p>';
+  } else {
+    ownedIngs.forEach(ing => {
+      const row = document.createElement('div');
+      row.className = 'flex items-center gap-3 rounded-lg border border-[#d4b080]/60 bg-[#fdf3dc]/75 p-3 fade-up';
+      row.innerHTML = `<span class="text-2xl leading-none">${ing.emoji}</span><div class="flex-1 min-w-0"><p class="font-display text-sm text-[#5c3018]">${ing.name}</p><p class="text-xs text-[#8b6040] italic truncate">${ing.desc}</p></div><span class="font-display text-lg text-[#d4a73a] shrink-0">×${state.inventory.ingredients[ing.id]}</span>`;
+      ingDiv.appendChild(row);
+    });
+  }
+
+  const potDiv = document.getElementById('inventory-potions');
+  potDiv.innerHTML = '';
+  const ownedPots = Object.values(DATA.potions).filter(p => (state.inventory.potions[p.id]||0) > 0);
+  if (!ownedPots.length) {
+    potDiv.innerHTML = '<p class="text-sm text-[#7a5030] italic">No potions brewed yet. Visit the Workshop!</p>';
+  } else {
+    ownedPots.forEach(potion => {
+      const alreadyUsed = state.usedPotions.includes(potion.id);
+      const card = document.createElement('div');
+      card.className = 'rounded-lg border border-[#d4b080]/60 bg-[#fdf3dc]/80 p-4 fade-up';
+      card.innerHTML = `
+        <div class="flex items-start gap-3">
+          <span class="text-2xl leading-none">${potion.emoji}</span>
+          <div class="flex-1 min-w-0">
+            <p class="font-display text-sm text-[#5c3018]">${potion.name} <span class="text-[#d4a73a]">×${state.inventory.potions[potion.id]}</span></p>
+            <p class="text-xs text-[#8b6040] italic mb-3">${potion.desc}</p>
+            <button onclick="drinkPotion('${potion.id}')"
+                    class="px-4 py-1.5 font-display text-xs tracking-wide rounded border border-[#d4a73a] text-[#3a1808] hover:scale-105 active:scale-95 transition-all shadow"
+                    style="background:linear-gradient(135deg,#f0d080,#d4a73a);">
+              Drink ${alreadyUsed ? '(again)' : ''}
+            </button>
+          </div>
+        </div>`;
+      potDiv.appendChild(card);
+    });
+  }
+}
+
+// ╔══════════════════════════════════════════════════════════════╗
+// ║  TAB SWITCHING                                               ║
+// ╚══════════════════════════════════════════════════════════════╝
+
+function goHome() {
+  // Show landing, hide all tabs, restore the bright video
+  document.getElementById('landing').classList.remove('hidden');
+  document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
+  document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
+  document.getElementById('bg-video').style.filter   = 'brightness(0.92) saturate(1.05)';
+  document.getElementById('bg-overlay').style.background = 'rgba(8,3,1,0.15)';
+}
+
+function switchTab(name) {
+  // Hide landing screen once any tab is chosen
+  document.getElementById('landing').classList.add('hidden');
+  document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
+  document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
+  document.getElementById(`tab-${name}`).classList.remove('hidden');
+  document.querySelector(`[data-tab="${name}"]`).classList.add('active');
+
+  // Set video mood per tab; Explore uses the current location's mood
+  if (name === 'explore') {
+    setMood(DATA.locations[state.currentLocation].mood);
+    renderExplore();
+  } else {
+    setMood(name);
+    if (name === 'workshop')  renderWorkshop();
+    if (name === 'journal')   renderJournal();
+    if (name === 'inventory') renderInventory();
+  }
+}
+
+// ╔══════════════════════════════════════════════════════════════╗
+// ║  INIT                                                        ║
+// ╚══════════════════════════════════════════════════════════════╝
+
+(function init() {
+  const raw = localStorage.getItem('pp_v1_save');
+  if (raw) { try { state = JSON.parse(raw); } catch(e) {} }
+  // Restore Luma if she was already summoned in a previous session
+  if (state.usedPotions.includes('dreamTincture')) {
+    const sprite = document.getElementById('luma-sprite');
+    sprite.classList.remove('hidden');
+    sprite.style.animation = 'lumaFloat 3s ease-in-out infinite, lumaGlow 3s ease-in-out infinite';
+  }
+  // Landing: let the video breathe with minimal darkening
+  document.getElementById('bg-video').style.filter   = 'brightness(0.92) saturate(1.05)';
+  document.getElementById('bg-overlay').style.background = 'rgba(8,3,1,0.15)';
+  render();
+  addLog('Welcome, Crafter. The workshop is warm and the cauldron is ready.','🧪');
+})();
+</script>
+</body>
+</html>
